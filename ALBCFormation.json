@@ -1,0 +1,204 @@
+{
+    "AWSTemplateFormatVersion": "2010-09-09",
+    "Parameters": {
+        "InstanceType": {
+            "Description": "The EC2 instance type",
+            "Type": "String",
+            "Default": "t3.micro",
+            "AllowedValues": [
+                "t3.micro",
+                "t3.small",
+                "t3.medium"
+            ]
+        },
+        "KeyName": {
+            "Description": "Name of an existing EC2 KeyPair to enable SSH access to the instances",
+            "Type": "AWS::EC2::KeyPair::KeyName",
+            "Default": "jslearns-key01",
+            "ConstraintDescription": "must be the name of an existing EC2 KeyPair."
+        },
+        "ImageId": {
+            "Description": "The latest Amazon Linux 2 AMI built previously by Cloud Formation",
+            "Type": "AWS::EC2::Image::Id",
+            "Default": "ami-08ce168849a6bc293"
+        },
+        "OperatorEmail": {
+            "Description": "The email address to notify when there are any scaling activities",
+            "Default": "jacques.steenkamp@anz.com",
+            "Type": "String"
+        },
+        "Subnets": {
+            "Type": "List<AWS::EC2::Subnet::Id>",
+            "Description": "The list of SubnetIds in your Virtual Private Cloud (VPC)",
+            "Default": "subnet-01eb809f63b6fcadb,subnet-08ae5a396d5f24952",
+            "ConstraintDescription": "must be a list of at least two existing subnets associated with at least two different availability zones. They should be residing in the selected Virtual Private Cloud."
+        },
+        "VpcId": {
+            "Type": "AWS::EC2::VPC::Id",
+            "Description": "VpcId of your existing Virtual Private Cloud (VPC)",
+            "Default": "vpc-03745b8cc80ee4fee",
+            "ConstraintDescription": "must be the VPC Id of an existing Virtual Private Cloud. Outbound traffic for the default security group associated with this VPC should be enabled."
+        },
+        "WebSG": {
+            "Description": "Web Security Group",
+            "Type": "String",
+            "Default": "sg-076c5e356b22f5ef8",
+            "ConstraintDescription": "must be a valid security group"
+        }
+    },
+    "Resources": {
+        "ELBSecurityGroup": {
+            "Type": "AWS::EC2::SecurityGroup",
+            "Properties": {
+                "GroupDescription": "ELB Security Group",
+                "VpcId": {
+                    "Ref": "VpcId"
+                },
+                "SecurityGroupIngress": [
+                    {
+                        "IpProtocol": "tcp",
+                        "FromPort": 80,
+                        "ToPort": 80,
+                        "CidrIp": "0.0.0.0/0"
+                    }
+                ]
+            }
+        },
+        "EC2TargetGroup": {
+            "Type": "AWS::ElasticLoadBalancingV2::TargetGroup",
+            "Properties": {
+                "HealthCheckIntervalSeconds": 30,
+                "HealthCheckProtocol": "HTTP",
+                "HealthCheckTimeoutSeconds": 15,
+                "HealthyThresholdCount": 5,
+                "Matcher": {
+                    "HttpCode": "200"
+                },
+                "Name": "EC2TargetGroup",
+                "Port": 80,
+                "Protocol": "HTTP",
+                "TargetGroupAttributes": [
+                    {
+                        "Key": "deregistration_delay.timeout_seconds",
+                        "Value": "20"
+                    }
+                ],
+                "UnhealthyThresholdCount": 3,
+                "VpcId": {
+                    "Ref": "VpcId"
+                }
+            }
+        },
+        "ALBListener": {
+            "Type": "AWS::ElasticLoadBalancingV2::Listener",
+            "Properties": {
+                "DefaultActions": [
+                    {
+                        "Type": "forward",
+                        "TargetGroupArn": {
+                            "Ref": "EC2TargetGroup"
+                        }
+                    }
+                ],
+                "LoadBalancerArn": {
+                    "Ref": "ApplicationLoadBalancer"
+                },
+                "Port": 80,
+                "Protocol": "HTTP"
+            }
+        },
+        "ApplicationLoadBalancer": {
+            "Type": "AWS::ElasticLoadBalancingV2::LoadBalancer",
+            "Properties": {
+                "Scheme": "internet-facing",
+                "Subnets": {
+                    "Ref": "Subnets"
+                },
+                "SecurityGroups": [
+                    {
+                        "Fn::GetAtt": [
+                            "ELBSecurityGroup",
+                            "GroupId"
+                        ]
+                    }
+                ]
+            }
+        },
+        "LaunchTemplate": {
+            "Type": "AWS::EC2::LaunchTemplate",
+            "Properties": {
+                "LaunchTemplateName": {
+                    "Fn::Sub": "${AWS::StackName}-launch-template"
+                },
+                "LaunchTemplateData": {
+                    "ImageId": {
+                        "Ref": "ImageId"
+                    },
+                    "InstanceType": {
+                        "Ref": "InstanceType"
+                    },
+                    "KeyName": {
+                        "Ref": "KeyName"
+                    },
+                    "SecurityGroupIds": [
+                        {
+                            "Ref": "WebSG"
+                        }
+                    ]
+                }
+            }
+        },
+        "NotificationTopic": {
+            "Type": "AWS::SNS::Topic",
+            "Properties": {
+                "Subscription": [
+                    {
+                        "Endpoint": {
+                            "Ref": "OperatorEmail"
+                        },
+                        "Protocol": "email"
+                    }
+                ]
+            }
+        },
+        "WebServerGroup": {
+            "Type": "AWS::AutoScaling::AutoScalingGroup",
+            "Properties": {
+                "LaunchTemplate": {
+                    "LaunchTemplateId": {
+                        "Ref": "LaunchTemplate"
+                    },
+                    "Version": {
+                        "Fn::GetAtt": [
+                            "LaunchTemplate",
+                            "LatestVersionNumber"
+                        ]
+                    }
+                },
+                "MaxSize": "3",
+                "MinSize": "2",
+                "NotificationConfigurations": [
+                    {
+                        "TopicARN": {
+                            "Ref": "NotificationTopic"
+                        },
+                        "NotificationTypes": [
+                            "autoscaling:EC2_INSTANCE_LAUNCH",
+                            "autoscaling:EC2_INSTANCE_LAUNCH_ERROR",
+                            "autoscaling:EC2_INSTANCE_TERMINATE",
+                            "autoscaling:EC2_INSTANCE_TERMINATE_ERROR"
+                        ]
+                    }
+                ],
+                "TargetGroupARNs": [
+                    {
+                        "Ref": "EC2TargetGroup"
+                    }
+                ],
+                "VPCZoneIdentifier": {
+                    "Ref": "Subnets"
+                }
+            }
+        }
+    }
+}

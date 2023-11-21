@@ -1,0 +1,59 @@
+{
+    "AWSTemplateFormatVersion": "2010-09-09",
+    "Description": "This template deploys a Linux t2.micro Instance open HTTP/S access and SSH.",
+    "Mappings": {
+        "RegionMap": {
+            "ap-southeast-2": {
+                "AMI": "ami-048f52ae0e8ba05ae"
+            }
+        }
+    },
+    "Resources": {
+        "EC2Instance": {
+            "Type": "AWS::EC2::Instance",
+            "Properties": {
+                "ImageId": {
+                    "Fn::FindInMap": [
+                        "RegionMap",
+                        {
+                            "Ref": "AWS::Region"
+                        },
+                        "AMI"
+                    ]
+                },
+                "InstanceType": "t2.micro",
+                "SubnetId": "subnet-08ae5a396d5f24952",
+                "SecurityGroupIds": [
+                    "sg-076c5e356b22f5ef8"
+                ],
+                "Tags": [
+                    {
+                        "Key": "Name",
+                        "Value": "Taskman Project EC2"
+                    }
+                ],
+                "UserData": {
+                    "Fn::Base64": {
+                        "Fn::Join": [
+                            "",
+                            [
+                                "#!/bin/bash -xe\n",
+                                "yum update -y\n",
+                                "yum install git -y\n",
+                                "yum install build-essential -y\n"
+                            ]
+                        ]
+                    }
+                }
+            }
+        }
+    },
+    "Outputs": {
+        "EC2Instance": {
+            "Description": "EC2 Instance Name",
+            "Value": {
+                "Ref": "EC2Instance"
+            }
+        }
+    }
+}

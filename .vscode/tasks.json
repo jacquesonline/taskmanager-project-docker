@@ -1,0 +1,20 @@
+{
+  // See https://go.microsoft.com/fwlink/?LinkId=733558
+  // for the documentation about the tasks.json format
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Run Alpaca",
+      "type": "shell",
+      "command": "alpaca.exe -C http://auproxypac.service.anz/gblproxy.pac",
+      "windows": {
+        "command": "alpaca.exe -C http://auproxypac.service.anz/gblproxy.pac"
+      },
+      "group": "test",
+      "presentation": {
+        "reveal": "always",
+        "panel": "new"
+      }
+    }
+  ]
+}

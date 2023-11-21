@@ -1,0 +1,30 @@
+aws cloudformation create-stack \
+  --stack-name TrainingVPC \
+  --template-url https://taskmanagers3.s3.ap-southeast-2.amazonaws.com/CFTemplates/NetworkCFormation.json \
+  --capabilities CAPABILITY_IAM --profile=external
+
+aws cloudformation create-stack \
+  --stack-name TrainingEC2 \
+  --template-url https://taskmanagers3.s3.ap-southeast-2.amazonaws.com/CFTemplates/EC2CFormation.json \
+  --capabilities CAPABILITY_IAM --profile=external
+
+
+aws cloudformation create-stack \
+  --stack-name TrainingALB \
+  --template-url https://taskmanagers3.s3.ap-southeast-2.amazonaws.com/CFTemplates/ALBCFormation.json \
+  --capabilities CAPABILITY_IAM --profile=external
+
+aws cloudformation delete-stack --stack-name TrainingALB --profile=external
+
+aws s3 cp ALBCFormation.json s3://taskmanagers3/CFTemplates/ALBCFormation.json --profile=external
+
+aws s3 cp EC2CFormation.json s3://taskmanagers3/CFTemplates/EC2CFormation.json --profile=external
+
+
+aws cloudformation create-stack \
+  --stack-name POC-Disco \
+  --template-url  https://cf-templates-1tyjqw1atnfpm-ap-southeast-2.s3.ap-southeast-2.amazonaws.com/2023-06-26T100317.116Zplm-master.yaml \
+  --capabilities CAPABILITY_NAMED_IAM --profile=external
+
+aws cloudformation delete-stack --stack-name POC-Disco --profile=external
+
